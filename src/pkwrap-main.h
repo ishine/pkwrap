@@ -26,18 +26,29 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     matrix.def("TensorToKaldiMatrix",&TensorToKaldiMatrix);
     matrix.def("ReadKaldiMatrixFile", &ReadKaldiMatrixFile);
     py::class_<kaldi::Matrix<kaldi::BaseFloat> >(matrix, "Matrix");
+    py::class_<kaldi::CuSubMatrix<kaldi::BaseFloat> >(matrix, "CuSubMatrix");
     py::class_<kaldi::SequentialBaseFloatMatrixReader>(matrix, "SequentialBaseFloatMatrixReader")
         .def(py::init<std::string>())
         .def("Next", &kaldi::SequentialBaseFloatMatrixReader::Next)
         .def("Done", &kaldi::SequentialBaseFloatMatrixReader::Done)
         .def("Key", &kaldi::SequentialBaseFloatMatrixReader::Key)
         .def("Value", &kaldi::SequentialBaseFloatMatrixReader::Value);
-    py::class_<kaldi::BaseFloatMatrixWriter>(matrix, "BaseFloatMatrixWriter")
+    py::class_<kaldi::RandomAccessBaseFloatMatrixReader>(matrix, "RandomAccessBaseFloatMatrixReader")
         .def(py::init<std::string>())
-        .def("Write", &kaldi::BaseFloatMatrixWriter::Write)
-        .def("Close", &kaldi::BaseFloatMatrixWriter::Close);
+        .def("HasKey", &kaldi::RandomAccessBaseFloatMatrixReader::HasKey)
+        .def("Value", &kaldi::RandomAccessBaseFloatMatrixReader::Value);
+    py::class_<BaseFloatMatrixWriter>(matrix, "BaseFloatMatrixWriter")
+        .def(py::init<std::string>())
+        .def("Write", &BaseFloatMatrixWriter::Write)
+        .def("Close", &BaseFloatMatrixWriter::Close);
 
     auto nnet3 = kaldi_module.def_submodule("nnet3");
+    py::class_<kaldi::nnet3::SequentialNnetChainExampleReader>(nnet3, "SequentialNnetChainExampleReader")
+        .def(py::init<std::string>())
+        .def("Next", &kaldi::nnet3::SequentialNnetChainExampleReader::Next)
+        .def("Done", &kaldi::nnet3::SequentialNnetChainExampleReader::Done)
+        .def("Key", &kaldi::nnet3::SequentialNnetChainExampleReader::Key)
+        .def("Value", &kaldi::nnet3::SequentialNnetChainExampleReader::Value);
     py::class_<kaldi::nnet3::OnlineNaturalGradient>(nnet3, "OnlineNaturalGradient")
         .def(py::init<>())
         .def("SetRank", &kaldi::nnet3::OnlineNaturalGradient::SetRank)
@@ -58,7 +69,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     auto chain = kaldi_module.def_submodule("chain");
     // classes from Kaldi
     py::class_<kaldi::chain::DenominatorGraph>(chain, "DenominatorGraph");
-    py::class_<kaldi::chain::ChainTrainingOptions>(chain, "ChainTrainingOptions");
+    py::class_<kaldi::chain::ChainTrainingOptions>(chain, "ChainTrainingOptions")
+        .def_readwrite("xent_regularize", &kaldi::chain::ChainTrainingOptions::xent_regularize)
+        .def_readwrite("leaky_hmm_coefficient", &kaldi::chain::ChainTrainingOptions::leaky_hmm_coefficient)
+        .def_readwrite("out_of_range_regularize", &kaldi::chain::ChainTrainingOptions::out_of_range_regularize)
+        .def_readwrite("l2_regularize", &kaldi::chain::ChainTrainingOptions::l2_regularize);
+        
     py::class_<kaldi::nnet3::NnetChainExample>(chain, "NnetChainExample");
     py::class_<kaldi::chain::Supervision>(chain, "Supervision");
 
@@ -74,8 +90,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     chain.def("MergeChainEgs", &MergeChainEgs);
     chain.def("ShiftEgsVector", &ShiftEgsVector);
     chain.def("GetFeaturesFromEgs", &GetFeaturesFromEgs);
+    chain.def("GetFeaturesFromCompressedEgs", &GetFeaturesFromCompressedEgs);
     chain.def("GetIvectorsFromEgs", &GetIvectorsFromEgs);
     chain.def("GetFramesPerSequence", &GetFramesPerSequence);
     chain.def("GetSupervisionFromEgs", &GetSupervisionFromEgs);
+    chain.def("PrintSupervisionInfoE2E", &PrintSupervisionInfoE2E);
 }
 #endif

@@ -162,6 +162,32 @@ def get_egs_info(egs_dir):
 
     return num_archives
 
+def egs_reader(egs_rspec):
+    """Read a compressed examples (cegs) file in kaldi
+
+    This function is useful for reading the features and keys
+    for decoding the validation set.
+
+    Args:
+        egs_rspec: a rspecifier as the ones used in Kaldi. For example, if it is
+            a validation diagnostic compressed egs file we may specify it as
+
+            ```
+            ark:/path/to/valid_diagnostic.cegs
+            ```
+    Returns:
+        an iterable to iterate over each (key, utterance) tuple in egs_rspec
+    """
+    reader = kaldi.nnet3.SequentialNnetChainExampleReader(egs_rspec);
+    return reader
+
+def egs_reader_gen(egs_rspec):
+    """A generator function that calls compressed feat_reader to return pytorch Tensors"""
+    reader = egs_reader(egs_rspec)
+    while not reader.Done():
+        yield reader.Key(), kaldi.chain.GetFeaturesFromCompressedEgs(reader.Value())
+        reader.Next()
+
 def feat_reader(feature_rspec):
     """Read a matrix scp file in kaldi
 
@@ -197,8 +223,60 @@ def feat_writer(feature_wspec):
     writer = kaldi.matrix.BaseFloatMatrixWriter(feature_wspec)
     return writer
 
-def run(cmd):
+def run(cmd, quit_on_error=True):
     """Run a command using subprocess, quit if return code is non-zero"""
     p = subprocess.run(cmd)
-    if p.returncode != 0:
+    if quit_on_error and p.returncode != 0:
         quit(p.returncode)
+
+def copy_file(src, dest):
+    """Copy a file from source to destination
+    
+    This function calls subprocess to use the 'cp' command
+    in the shell. In the future we will just use the python
+    function.
+
+    Args:
+        src: path to source file, a string
+        dest: path to destination file, a string
+    """
+    subprocess.run(["cp", src, dest])
+
+def copy_folder(src, dest):
+    """Copy src folder to destination
+
+    This function calls subprocess.run to run 'cp -r' command.
+    In the future, we will just use the python function in the
+    standard library to do this.
+
+    Args:
+        src: source folder
+        dest: destination folder
+    """
+    subprocess.run(["cp", "-r", src, dest])
+
+def read_single_param_file(src, typename=int):
+    """Read a file with one value
+
+    This function can be used to read files in Kaldi which
+    has parameter values stored in them. E.g. egs/info/num_archives.
+    Pass the typename in advance to return the value without errors.
+
+    Args:
+        src: the path to file that contains the parameter value
+        typename (type): The type of value to be expected in the file.
+            Default is int. Any custom value that can take a string
+            can be passed.
+
+    Returns:
+        Value in the "src" file casted into type "typename"
+         
+    Raises:
+        AssertionError if parameter value is empty.
+    """
+    param = None
+    with open(src) as ipf:
+        param = typename(ipf.readline().strip())
+    assert param is not None
+    return param
+
